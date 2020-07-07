@@ -1,8 +1,7 @@
 import numpy as np
 import pickle
 import sys
-
-output_path = './model.pkl'
+import os
 
 if __name__ == '__main__':
   if len(sys.argv) < 2:
@@ -22,5 +21,6 @@ if __name__ == '__main__':
   }
   if 'cocoplus_regressor' in src_data.keys():
     model['joint_regressor'] = src_data['cocoplus_regressor']
+  output_path = os.path.join('.', os.path.basename(src_path))
   with open(output_path, 'wb') as f:
     pickle.dump(model, f)
