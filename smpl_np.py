@@ -32,8 +32,10 @@ class SMPLModel():
       for i in range(1, self.kintree_table.shape[1])
     }
 
-    self.pose_shape = [24, 3]
-    self.beta_shape = [10]
+    self.pose_dims = self.J_regressor.shape[0]
+    self.shape_dims = self.shapedirs.shape[-1]
+    self.pose_shape = [self.pose_dims, 3]
+    self.beta_shape = [self.shape_dims]
     self.trans_shape = [3]
 
     self.pose = np.zeros(self.pose_shape)
@@ -53,12 +55,12 @@ class SMPLModel():
 
     Parameters:
     ---------
-    pose: Also known as 'theta', a [24,3] matrix indicating child joint rotation
+    pose: Also known as 'theta', a [self.pose_dims,3] matrix indicating child joint rotation
     relative to parent joint. For root joint it's global orientation.
     Represented in a axis-angle format.
 
-    beta: Parameter for model shape. A vector of shape [10]. Coefficients for
-    PCA component. Only 10 components were released by MPI.
+    beta: Parameter for model shape. A vector of shape [self.shape_dims]. Coefficients for
+    PCA component. Only self.shape_dims components were released by MPI.
 
     trans: Global translation of shape [3].
 
@@ -109,7 +111,7 @@ class SMPLModel():
     G = G - self.pack(
       np.matmul(
         G,
-        np.hstack([self.J, np.zeros([24, 1])]).reshape([24, 4, 1])
+        np.hstack([self.J, np.zeros([self.pose_dims, 1])]).reshape([self.pose_dims, 4, 1])
         )
       )
     # transformation of each vertex

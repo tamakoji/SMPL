@@ -74,8 +74,18 @@ def pack(x):
   )
   return ret
 
+def smpl_parse_params(model_path):
+  """
+  get smpl dims
+  """
+  # For detailed comments see smpl_np.py
+  with open(model_path, 'rb') as f:
+    params = pickle.load(f)
+  pose_dims = params['J_regressor'].shape[0]
+  shape_dims = params['shapedirs'].shape[-1]
+  return pose_dims, shape_dims, params
 
-def smpl_model(model_path, betas, pose, trans, simplify=False):
+def smpl_model(params, betas, pose, trans, simplify=False):
   """
   Construct a compute graph that takes in parameters and outputs a tensor as
   model vertices. Face indices are also returned as a numpy ndarray.
@@ -96,10 +106,6 @@ def smpl_model(model_path, betas, pose, trans, simplify=False):
   A tensor for vertices, and a numpy ndarray as face indices.
 
   """
-  # For detailed comments see smpl_np.py
-  with open(model_path, 'rb') as f:
-    params = pickle.load(f)
-
   J_regressor = tf.constant(
     np.array(params['J_regressor'].todense(),
     dtype=np.float64)
@@ -109,6 +115,8 @@ def smpl_model(model_path, betas, pose, trans, simplify=False):
   v_template = tf.constant(params['v_template'], dtype=np.float64)
   shapedirs = tf.constant(params['shapedirs'], dtype=np.float64)
   f = params['f']
+  pose_dims = J_regressor.shape[0]
+  shape_dims = shapedirs.shape[-1]
 
   kintree_table = params['kintree_table']
   id_to_col = {kintree_table[1, i]: i for i in range(kintree_table.shape[1])}
@@ -150,8 +158,8 @@ def smpl_model(model_path, betas, pose, trans, simplify=False):
               tf.matmul(
                 stacked,
                 tf.reshape(
-                  tf.concat((J, tf.zeros((24, 1), dtype=tf.float64)), axis=1),
-                  (24, 4, 1)
+                  tf.concat((J, tf.zeros((pose_dims, 1), dtype=tf.float64)), axis=1),
+                  (pose_dims, 4, 1)
                 )
               )
             )
@@ -167,10 +175,12 @@ def smpl_model(model_path, betas, pose, trans, simplify=False):
 
 
 if __name__ == '__main__':
-  pose_size = 72
-  beta_size = 10
 
   np.random.seed(9608)
+  pose_dims, shape_dims, params = smpl_parse_params('./model.pkl')
+  pose_size = pose_dims * 3
+  beta_size = shape_dims
+
   pose = (np.random.rand(pose_size) - 0.5) * 0.4
   betas = (np.random.rand(beta_size) - 0.5) * 0.06
   trans = np.zeros(3)
@@ -179,7 +189,7 @@ if __name__ == '__main__':
   betas = tf.constant(betas, dtype=tf.float64)
   trans = tf.constant(trans, dtype=tf.float64)
 
-  output, faces = smpl_model('./model.pkl', betas, pose, trans, True)
+  output, faces = smpl_model(params, betas, pose, trans, True)
   sess = tf.Session()
   result = sess.run(output)
 

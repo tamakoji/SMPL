@@ -28,6 +28,8 @@ class SMPLModel(Module):
     self.shapedirs = torch.from_numpy(params['shapedirs']).type(torch.float64)
     self.kintree_table = params['kintree_table']
     self.faces = params['f']
+    self.pose_dims = self.J_regressor.shape[0]
+    self.shape_dims = self.shapedirs.shape[-1]
     self.device = device if device is not None else torch.device('cpu')
     for name in ['J_regressor', 'joint_regressor', 'weights', 'posedirs', 'v_template', 'shapedirs']:
       _tensor = getattr(self, name)
@@ -123,11 +125,11 @@ class SMPLModel(Module):
 
           Parameters:
           ---------
-          pose: Also known as 'theta', an [N, 24, 3] tensor indicating child joint rotation
+          pose: Also known as 'theta', an [N, self.pose_dims, 3] tensor indicating child joint rotation
           relative to parent joint. For root joint it's global orientation.
           Represented in a axis-angle format.
 
-          betas: Parameter for model shape. A tensor of shape [N, 10] as coefficients of
+          betas: Parameter for model shape. A tensor of shape [N, self.shape_dims] as coefficients of
           PCA components. Only 10 components were released by SMPL author.
 
           trans: Global translation tensor of shape [N, 3].
@@ -181,8 +183,8 @@ class SMPLModel(Module):
         torch.matmul(
           stacked,
           torch.reshape(
-            torch.cat((J, torch.zeros((batch_num, 24, 1), dtype=torch.float64).to(self.device)), dim=2),
-            (batch_num, 24, 4, 1)
+            torch.cat((J, torch.zeros((batch_num, self.pose_dims, 1), dtype=torch.float64).to(self.device)), dim=2),
+            (batch_num, self.pose_dims, 4, 1)
           )
         )
       )
@@ -209,11 +211,10 @@ def test_gpu(gpu_id=[0]):
     device = torch.device('cpu')
   #print(device)
 
-  pose_size = 72
-  beta_size = 10
-
   np.random.seed(9608)
   model = SMPLModel(device=device)
+  pose_size = model.pose_dims * 3
+  beta_size = model.shape_dims
   for i in range(10):
       pose = torch.from_numpy((np.random.rand(32, pose_size) - 0.5) * 0.4)\
               .type(torch.float64).to(device)

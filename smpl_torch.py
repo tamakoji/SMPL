@@ -20,6 +20,8 @@ class SMPLModel(Module):
     self.shapedirs = torch.from_numpy(params['shapedirs']).type(torch.float64)
     self.kintree_table = params['kintree_table']
     self.faces = params['f']
+    self.pose_dims = self.J_regressor.shape[0]
+    self.shape_dims = self.shapedirs.shape[-1]
     self.device = device if device is not None else torch.device('cpu')
     for name in ['J_regressor', 'weights', 'posedirs', 'v_template', 'shapedirs']:
       _tensor = getattr(self, name)
@@ -109,12 +111,12 @@ class SMPLModel(Module):
 
           Prameters:
           ---------
-          pose: Also known as 'theta', a [24,3] tensor indicating child joint rotation
+          pose: Also known as 'theta', a [self.pose_dims,3] tensor indicating child joint rotation
           relative to parent joint. For root joint it's global orientation.
           Represented in a axis-angle format.
 
-          betas: Parameter for model shape. A tensor of shape [10] as coefficients of
-          PCA components. Only 10 components were released by SMPL author.
+          betas: Parameter for model shape. A tensor of shape [self.shape_dims] as coefficients of
+          PCA components. Only self.shape_dims components were released by SMPL author.
 
           trans: Global translation tensor of shape [3].
 
@@ -165,8 +167,8 @@ class SMPLModel(Module):
         torch.matmul(
           stacked,
           torch.reshape(
-            torch.cat((J, torch.zeros((24, 1), dtype=torch.float64).to(self.device)), dim=1),
-            (24, 4, 1)
+            torch.cat((J, torch.zeros((self.pose_dims, 1), dtype=torch.float64).to(self.device)), dim=1),
+            (self.pose_dims, 4, 1)
           )
         )
       )
@@ -188,8 +190,10 @@ def test_gpu(gpu_id=[0]):
     device = torch.device('cpu')
   print(device)
 
-  pose_size = 72
-  beta_size = 10
+  model = SMPLModel(device=device)
+
+  pose_size = model.pose_dims * 3
+  beta_size = model.shape_dims
 
   np.random.seed(9608)
   pose = torch.from_numpy((np.random.rand(pose_size) - 0.5) * 0.4)\
@@ -199,7 +203,6 @@ def test_gpu(gpu_id=[0]):
   trans = torch.from_numpy(np.zeros(3)).type(torch.float64).to(device)
   outmesh_path = './smpl_torch.obj'
 
-  model = SMPLModel(device=device)
   result = model(betas, pose, trans)
   model.write_obj(result, outmesh_path)
 
